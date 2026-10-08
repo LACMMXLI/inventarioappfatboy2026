@@ -1,0 +1,4 @@
+# Optional port for a server without Coolify or for a deployment smoke test.
+services:
+  frontend:
+    ports: ["${WEB_BIND:-127.0.0.1}:${WEB_PORT:-8080}:8080"]

@@ -1,0 +1,34 @@
+{
+  "name": "@fatboy/web",
+  "private": true,
+  "version": "1.0.0",
+  "type": "module",
+  "scripts": {
+    "dev": "vite --host 127.0.0.1",
+    "build": "tsc -b && vite build",
+    "test": "vitest run"
+  },
+  "dependencies": {
+    "@fatboy/contracts": "workspace:*",
+    "@hookform/resolvers": "5.2.2",
+    "@tanstack/react-query": "5.90.20",
+    "lucide-react": "0.563.0",
+    "react": "19.2.4",
+    "react-dom": "19.2.4",
+    "react-hook-form": "7.71.1",
+    "react-router-dom": "7.18.4",
+    "recharts": "3.7.0",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@tailwindcss/vite": "4.1.18",
+    "@types/react": "19.2.10",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.1.3",
+    "tailwindcss": "4.1.18",
+    "typescript": "5.9.3",
+    "vite": "7.3.1",
+    "vite-plugin-pwa": "1.2.0",
+    "vitest": "4.0.18"
+  }
+}

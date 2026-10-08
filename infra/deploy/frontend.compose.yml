@@ -1,0 +1,26 @@
+name: ${STACK_PREFIX:-fatboy}-frontend
+services:
+  frontend:
+    image: ${WEB_IMAGE:-fatboy-web}:${WEB_VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+    environment:
+      API_UPSTREAM: ${API_UPSTREAM:-http://fatboy-api:3000}
+    expose: ["8080"]
+    networks: [shared]
+    healthcheck:
+      test:
+        [
+          CMD-SHELL,
+          "wget -q -O /dev/null http://127.0.0.1:8080/healthz || exit 1",
+        ]
+      interval: 15s
+      timeout: 3s
+      start_period: 10s
+      retries: 5
+networks:
+  shared:
+    external: true
+    name: ${DEPLOY_NETWORK:-fatboy-production}

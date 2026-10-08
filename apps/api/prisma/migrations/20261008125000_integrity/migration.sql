@@ -1,0 +1,25 @@
+ALTER TABLE products ADD CONSTRAINT product_cost_positive CHECK (cost >= 0);
+ALTER TABLE product_presentations ADD CONSTRAINT factor_positive CHECK (factor > 0);
+ALTER TABLE branch_products ADD CONSTRAINT minimum_positive CHECK (minimum >= 0);
+ALTER TABLE stock_balances ADD CONSTRAINT balance_nonnegative CHECK (quantity >= 0);
+ALTER TABLE stock_balances ADD CONSTRAINT count_lock_fk FOREIGN KEY ("lockedByCountId") REFERENCES cycle_counts(id);
+ALTER TABLE count_schedules ADD CONSTRAINT schedule_assignee_fk FOREIGN KEY ("assigneeId") REFERENCES users(id);
+ALTER TABLE count_schedules ADD CONSTRAINT interval_positive CHECK ("intervalDays" > 0);
+ALTER TABLE count_revisions ADD CONSTRAINT revision_user_fk FOREIGN KEY ("userId") REFERENCES users(id);
+ALTER TABLE stock_adjustments ADD CONSTRAINT approver_fk FOREIGN KEY ("approvedBy") REFERENCES users(id);
+ALTER TABLE transfers ADD CONSTRAINT creator_fk FOREIGN KEY ("createdBy") REFERENCES users(id);
+ALTER TABLE transfer_receipts ADD CONSTRAINT receipt_user_fk FOREIGN KEY ("userId") REFERENCES users(id);
+ALTER TABLE idempotency_requests ADD CONSTRAINT idempotency_user_fk FOREIGN KEY ("userId") REFERENCES users(id);
+ALTER TABLE audit_logs ADD CONSTRAINT audit_branch_fk FOREIGN KEY ("branchId") REFERENCES branches(id);
+ALTER TABLE transfers ADD CONSTRAINT different_branches CHECK ("originId" <> "destinationId");
+ALTER TABLE transfer_items ADD CONSTRAINT transfer_conservation CHECK (sent > 0 AND received >= 0 AND returned >= 0 AND lost >= 0 AND received + returned + lost <= sent);
+ALTER TABLE transfer_receipt_items ADD CONSTRAINT receipt_positive CHECK (quantity > 0);
+ALTER TABLE cycle_count_items ADD CONSTRAINT physical_nonnegative CHECK (physical IS NULL OR physical >= 0);
+ALTER TABLE cycle_counts ADD CONSTRAINT valid_count_status CHECK (status IN ('BORRADOR','EN_PROCESO','ENVIADO','EN_REVISION','APROBADO','RECHAZADO','CANCELADO'));
+ALTER TABLE transfers ADD CONSTRAINT valid_transfer_status CHECK (status IN ('BORRADOR','SOLICITADA','EN_TRANSITO','RECIBIDA_PARCIAL','CERRADA','CANCELADA'));
+CREATE FUNCTION deny_history_mutation() RETURNS trigger LANGUAGE plpgsql AS $$
+BEGIN RAISE EXCEPTION 'Historical records are immutable'; END;
+$$;
+CREATE TRIGGER immutable_movements BEFORE UPDATE OR DELETE ON inventory_movements FOR EACH ROW EXECUTE FUNCTION deny_history_mutation();
+CREATE TRIGGER immutable_audits BEFORE UPDATE OR DELETE ON audit_logs FOR EACH ROW EXECUTE FUNCTION deny_history_mutation();
+CREATE TRIGGER immutable_revisions BEFORE UPDATE OR DELETE ON count_revisions FOR EACH ROW EXECUTE FUNCTION deny_history_mutation();

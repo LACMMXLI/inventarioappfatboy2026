@@ -1,0 +1,29 @@
+server {
+  listen 8080;
+  server_name _;
+  root /usr/share/nginx/html;
+  index index.html;
+  client_max_body_size 3m;
+  add_header X-Content-Type-Options nosniff always;
+  add_header Referrer-Policy same-origin always;
+  add_header X-Frame-Options DENY always;
+
+  # Re-resolve Docker DNS after replacing the API container; keep the URI intact.
+  resolver 127.0.0.11 valid=10s ipv6=off;
+  resolver_timeout 5s;
+  set $api_upstream "${API_UPSTREAM}";
+  location /api/ {
+    proxy_pass $api_upstream$request_uri;
+    proxy_set_header Host $host;
+    proxy_set_header X-Real-IP $remote_addr;
+    proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+    proxy_set_header X-Forwarded-Proto $scheme;
+    proxy_connect_timeout 5s;
+    proxy_read_timeout 60s;
+  }
+  location = /healthz { access_log off; default_type text/plain; return 200 "ok\n"; }
+  location /assets/ { expires 1y; add_header Cache-Control "public, immutable"; }
+  location = /sw.js { add_header Cache-Control "no-cache"; }
+  location = /index.html { add_header Cache-Control "no-cache"; }
+  location / { try_files $uri $uri/ /index.html; }
+}

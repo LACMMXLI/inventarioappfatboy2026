@@ -1,0 +1,88 @@
+name: fatboy-inventarios
+services:
+  db:
+    image: postgres:17.9-bookworm
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: fatboy
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
+      POSTGRES_DB: fatboy
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: [CMD-SHELL, pg_isready -U fatboy -d fatboy]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+  init:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    environment: &api_environment
+      DATABASE_URL: postgresql://fatboy:${POSTGRES_PASSWORD}@db:5432/fatboy?schema=public
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET}
+      APP_ORIGIN: ${APP_ORIGIN:?Configura APP_ORIGIN}
+      NODE_ENV: production
+      ADMIN_EMAIL: ${ADMIN_EMAIL:?Configura ADMIN_EMAIL}
+      ADMIN_PASSWORD: ${ADMIN_PASSWORD:?Configura ADMIN_PASSWORD}
+      UPLOAD_DIR: /app/uploads
+    command: [sh, -c, "pnpm db:migrate && pnpm db:seed"]
+    depends_on:
+      db:
+        condition: service_healthy
+  api:
+    build:
+      context: .
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    environment: *api_environment
+    volumes:
+      - uploads:/app/uploads
+    depends_on:
+      init:
+        condition: service_completed_successfully
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+  web:
+    build:
+      context: .
+      dockerfile: infra/docker/web.Dockerfile
+    restart: unless-stopped
+    ports:
+      - "${WEB_PORT:-8080}:8080"
+    depends_on:
+      api:
+        condition: service_healthy
+  backup:
+    profiles: [backup]
+    build:
+      context: .
+      dockerfile: infra/docker/backup.Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: db
+      PGUSER: fatboy
+      PGDATABASE: fatboy
+      PGPASSWORD: ${POSTGRES_PASSWORD}
+      AGE_RECIPIENT: ${AGE_RECIPIENT:-}
+      BACKUP_REMOTE: ${BACKUP_REMOTE:-}
+    volumes:
+      - ${RCLONE_CONFIG_PATH:-./infra/rclone.conf}:/root/.config/rclone/rclone.conf:ro
+      - uploads:/uploads:ro
+      - backup_status:/status
+    depends_on:
+      db:
+        condition: service_healthy
+volumes:
+  postgres_data:
+  uploads:
+  backup_status:

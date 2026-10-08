@@ -1,0 +1,26 @@
+name: Despliegue independiente
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+permissions:
+  contents: read
+jobs:
+  docker-isolation:
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "24"
+      - name: Validar sintaxis del script de despliegue
+        run: sh -n scripts/deploy.sh
+      - name: Construir imágenes y probar actualizaciones aisladas
+        run: node scripts/verify-deployment.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: deployment-evidence
+          path: .local/deployment-result.json

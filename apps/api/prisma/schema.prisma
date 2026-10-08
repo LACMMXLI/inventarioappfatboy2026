@@ -1,0 +1,307 @@
+generator client {
+  provider = "prisma-client-js"
+}
+datasource db {
+  provider = "postgresql"
+  url = env("DATABASE_URL")
+}
+model Role {
+  id String @id
+  name String
+  users User[]
+  permissions RolePermission[]
+  @@map("roles")
+}
+model Permission {
+  id String @id
+  roles RolePermission[]
+  @@map("permissions")
+}
+model RolePermission {
+  roleId String
+  permissionId String
+  role Role @relation(fields:[roleId],references:[id])
+  permission Permission @relation(fields:[permissionId],references:[id])
+  @@id([roleId,permissionId])
+  @@map("role_permissions")
+}
+model User {
+  id String @id @default(uuid())
+  name String
+  email String @unique
+  passwordHash String
+  active Boolean @default(true)
+  roleId String
+  role Role @relation(fields:[roleId],references:[id])
+  branches UserBranch[]
+  sessions RefreshSession[]
+  movements InventoryMovement[]
+  counts CycleCount[] @relation("Assignee")
+  audits AuditLog[]
+  createdAt DateTime @default(now())
+  @@map("users")
+}
+model UserBranch {
+  userId String
+  branchId String
+  user User @relation(fields:[userId],references:[id])
+  branch Branch @relation(fields:[branchId],references:[id])
+  @@id([userId,branchId])
+  @@map("user_branches")
+}
+model RefreshSession {
+  id String @id @default(uuid())
+  userId String
+  tokenHash String @unique
+  expiresAt DateTime
+  revokedAt DateTime?
+  createdAt DateTime @default(now())
+  user User @relation(fields:[userId],references:[id])
+  @@index([userId])
+  @@map("refresh_sessions")
+}
+model Branch {
+  id String @id @default(uuid())
+  name String @unique
+  active Boolean @default(true)
+  users UserBranch[]
+  products BranchProduct[]
+  balances StockBalance[]
+  movements InventoryMovement[]
+  counts CycleCount[]
+  schedules CountSchedule[]
+  outgoing Transfer[] @relation("Origin")
+  incoming Transfer[] @relation("Destination")
+  @@map("branches")
+}
+model Category {
+  id String @id @default(uuid())
+  name String @unique
+  products Product[]
+  @@map("categories")
+}
+model Unit {
+  id String @id @default(uuid())
+  name String @unique
+  symbol String
+  fractional Boolean @default(true)
+  products Product[]
+  @@map("units")
+}
+model Product {
+  id String @id @default(uuid())
+  code String @unique
+  name String
+  categoryId String
+  unitId String
+  cost Decimal @db.Decimal(18,4)
+  barcode String? @unique
+  photo String?
+  active Boolean @default(true)
+  category Category @relation(fields:[categoryId],references:[id])
+  unit Unit @relation(fields:[unitId],references:[id])
+  presentations ProductPresentation[]
+  branches BranchProduct[]
+  balances StockBalance[]
+  movements InventoryMovement[]
+  countItems CycleCountItem[]
+  transferItems TransferItem[]
+  @@index([categoryId])
+  @@map("products")
+}
+model ProductPresentation {
+  id String @id @default(uuid())
+  productId String
+  name String
+  factor Decimal @db.Decimal(18,6)
+  product Product @relation(fields:[productId],references:[id])
+  @@unique([productId,name])
+  @@map("product_presentations")
+}
+model BranchProduct {
+  branchId String
+  productId String
+  minimum Decimal @default(0) @db.Decimal(18,6)
+  active Boolean @default(true)
+  branch Branch @relation(fields:[branchId],references:[id])
+  product Product @relation(fields:[productId],references:[id])
+  @@id([branchId,productId])
+  @@map("branch_products")
+}
+model StockBalance {
+  branchId String
+  productId String
+  quantity Decimal @default(0) @db.Decimal(18,6)
+  lockedByCountId String?
+  branch Branch @relation(fields:[branchId],references:[id])
+  product Product @relation(fields:[productId],references:[id])
+  @@id([branchId,productId])
+  @@map("stock_balances")
+}
+model InventoryMovement {
+  id String @id @default(uuid())
+  branchId String
+  productId String
+  userId String
+  type String
+  quantity Decimal @db.Decimal(18,6)
+  cost Decimal @db.Decimal(18,4)
+  presentationName String?
+  factor Decimal @default(1) @db.Decimal(18,6)
+  reason String
+  reference String?
+  reversalOfId String? @unique
+  createdAt DateTime @default(now())
+  branch Branch @relation(fields:[branchId],references:[id])
+  product Product @relation(fields:[productId],references:[id])
+  user User @relation(fields:[userId],references:[id])
+  reversalOf InventoryMovement? @relation("Reversal",fields:[reversalOfId],references:[id])
+  reversedBy InventoryMovement? @relation("Reversal")
+  @@index([branchId,productId,createdAt])
+  @@index([type,createdAt])
+  @@map("inventory_movements")
+}
+model CountSchedule {
+  id String @id @default(uuid())
+  branchId String
+  assigneeId String
+  name String
+  productIds String[]
+  frequency String
+  intervalDays Int @default(1)
+  nextRunAt DateTime
+  active Boolean @default(true)
+  branch Branch @relation(fields:[branchId],references:[id])
+  counts CycleCount[]
+  @@map("count_schedules")
+}
+model CycleCount {
+  id String @id @default(uuid())
+  branchId String
+  assigneeId String
+  name String
+  status String @default("BORRADOR")
+  scheduleId String?
+  scheduledFor DateTime?
+  createdAt DateTime @default(now())
+  startedAt DateTime?
+  submittedAt DateTime?
+  resolvedAt DateTime?
+  branch Branch @relation(fields:[branchId],references:[id])
+  assignee User @relation("Assignee",fields:[assigneeId],references:[id])
+  schedule CountSchedule? @relation(fields:[scheduleId],references:[id])
+  items CycleCountItem[]
+  adjustments StockAdjustment[]
+  @@unique([scheduleId,scheduledFor])
+  @@index([branchId,status])
+  @@map("cycle_counts")
+}
+model CycleCountItem {
+  id String @id @default(uuid())
+  countId String
+  productId String
+  reference Decimal @default(0) @db.Decimal(18,6)
+  physical Decimal? @db.Decimal(18,6)
+  difference Decimal? @db.Decimal(18,6)
+  cost Decimal @db.Decimal(18,4)
+  version Int @default(0)
+  count CycleCount @relation(fields:[countId],references:[id])
+  product Product @relation(fields:[productId],references:[id])
+  revisions CountRevision[]
+  @@unique([countId,productId])
+  @@map("cycle_count_items")
+}
+model CountRevision {
+  id String @id @default(uuid())
+  itemId String
+  userId String
+  reference Decimal @db.Decimal(18,6)
+  physical Decimal? @db.Decimal(18,6)
+  reason String
+  createdAt DateTime @default(now())
+  item CycleCountItem @relation(fields:[itemId],references:[id])
+  @@map("count_revisions")
+}
+model StockAdjustment {
+  id String @id @default(uuid())
+  countId String @unique
+  approvedBy String
+  createdAt DateTime @default(now())
+  count CycleCount @relation(fields:[countId],references:[id])
+  @@map("stock_adjustments")
+}
+model Transfer {
+  id String @id @default(uuid())
+  originId String
+  destinationId String
+  status String @default("BORRADOR")
+  reason String
+  createdBy String
+  createdAt DateTime @default(now())
+  sentAt DateTime?
+  closedAt DateTime?
+  origin Branch @relation("Origin",fields:[originId],references:[id])
+  destination Branch @relation("Destination",fields:[destinationId],references:[id])
+  items TransferItem[]
+  receipts TransferReceipt[]
+  @@index([originId,destinationId,status])
+  @@map("transfers")
+}
+model TransferItem {
+  id String @id @default(uuid())
+  transferId String
+  productId String
+  sent Decimal @db.Decimal(18,6)
+  received Decimal @default(0) @db.Decimal(18,6)
+  returned Decimal @default(0) @db.Decimal(18,6)
+  lost Decimal @default(0) @db.Decimal(18,6)
+  cost Decimal @db.Decimal(18,4)
+  transfer Transfer @relation(fields:[transferId],references:[id])
+  product Product @relation(fields:[productId],references:[id])
+  receiptItems TransferReceiptItem[]
+  @@unique([transferId,productId])
+  @@map("transfer_items")
+}
+model TransferReceipt {
+  id String @id @default(uuid())
+  transferId String
+  userId String
+  kind String @default("RECEIVE")
+  reason String
+  createdAt DateTime @default(now())
+  transfer Transfer @relation(fields:[transferId],references:[id])
+  items TransferReceiptItem[]
+  @@map("transfer_receipts")
+}
+model TransferReceiptItem {
+  id String @id @default(uuid())
+  receiptId String
+  transferItemId String
+  quantity Decimal @db.Decimal(18,6)
+  receipt TransferReceipt @relation(fields:[receiptId],references:[id])
+  transferItem TransferItem @relation(fields:[transferItemId],references:[id])
+  @@map("transfer_receipt_items")
+}
+model AuditLog {
+  id String @id @default(uuid())
+  userId String?
+  branchId String?
+  action String
+  entity String
+  entityId String
+  before Json?
+  after Json?
+  createdAt DateTime @default(now())
+  user User? @relation(fields:[userId],references:[id])
+  @@index([branchId,createdAt])
+  @@map("audit_logs")
+}
+model IdempotencyRequest {
+  key String @id
+  userId String
+  operation String
+  hash String
+  response Json
+  createdAt DateTime @default(now())
+  @@map("idempotency_requests")
+}

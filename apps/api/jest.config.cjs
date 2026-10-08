@@ -1,0 +1,1 @@
+module.exports={preset:'ts-jest',testEnvironment:'node',testMatch:['**/*.spec.ts'],setupFiles:['<rootDir>/test/setup.cjs'],testTimeout:30000,transform:{'^.+\\.tsx?$':['ts-jest',{tsconfig:{experimentalDecorators:true,emitDecoratorMetadata:true,esModuleInterop:true}}]}};

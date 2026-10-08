@@ -1,0 +1,35 @@
+name: ${STACK_PREFIX:-fatboy}-backups
+services:
+  backup:
+    build:
+      context: ../..
+      dockerfile: infra/docker/backup.Dockerfile
+    restart: unless-stopped
+    environment:
+      PGHOST: fatboy-db
+      PGUSER: fatboy
+      PGDATABASE: fatboy
+      PGPASSWORD: ${POSTGRES_PASSWORD:?Configura POSTGRES_PASSWORD}
+      AGE_RECIPIENT: ${AGE_RECIPIENT:?Configura AGE_RECIPIENT}
+      BACKUP_REMOTE: ${BACKUP_REMOTE:?Configura BACKUP_REMOTE}
+    volumes:
+      - type: bind
+        source: ${RCLONE_CONFIG_PATH:?Ruta absoluta de rclone.conf en el servidor}
+        target: /root/.config/rclone/rclone.conf
+        read_only: true
+        bind:
+          create_host_path: false
+      - uploads:/uploads:ro
+      - backup_status:/status
+    networks: [shared]
+networks:
+  shared:
+    external: true
+    name: ${DEPLOY_NETWORK:-fatboy-production}
+volumes:
+  uploads:
+    external: true
+    name: ${UPLOADS_VOLUME:-fatboy-uploads}
+  backup_status:
+    external: true
+    name: ${BACKUP_STATUS_VOLUME:-fatboy-backup-status}

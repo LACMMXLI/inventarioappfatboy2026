@@ -1,0 +1,1 @@
+const fs=require('node:fs');const path=require('node:path');const file=path.resolve(__dirname,'../../../.local/test-config.json');if(!fs.existsSync(file))throw new Error('Ejecuta node scripts/prepare-tests.mjs antes de las pruebas.');Object.assign(process.env,JSON.parse(fs.readFileSync(file,'utf8')));

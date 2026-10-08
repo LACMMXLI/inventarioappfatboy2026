@@ -1,0 +1,42 @@
+name: ${STACK_PREFIX:-fatboy}-api
+services:
+  api:
+    image: ${API_IMAGE:-fatboy-api}:${API_VERSION:-local}
+    build:
+      context: ../..
+      dockerfile: infra/docker/api.Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 30s
+    environment:
+      DATABASE_URL: ${DATABASE_URL:?Configura DATABASE_URL}
+      JWT_SECRET: ${JWT_SECRET:?Configura JWT_SECRET}
+      APP_ORIGIN: ${APP_ORIGIN:?Configura APP_ORIGIN}
+      NODE_ENV: production
+      PORT: 3000
+      UPLOAD_DIR: /app/uploads
+    volumes:
+      - uploads:/app/uploads
+    expose: ["3000"]
+    networks:
+      shared:
+        aliases: [fatboy-api]
+    healthcheck:
+      test:
+        [
+          CMD,
+          node,
+          -e,
+          "fetch('http://127.0.0.1:3000/api/v1/health').then(r=>{if(!r.ok)process.exit(1)}).catch(()=>process.exit(1))",
+        ]
+      interval: 15s
+      timeout: 5s
+      start_period: 30s
+      retries: 5
+networks:
+  shared:
+    external: true
+    name: ${DEPLOY_NETWORK:-fatboy-production}
+volumes:
+  uploads:
+    external: true
+    name: ${UPLOADS_VOLUME:-fatboy-uploads}
